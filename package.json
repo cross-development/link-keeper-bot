@@ -1,0 +1,25 @@
+{
+  "name": "link-keeper-bot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/cross-development/link-keeper-bot.git",
+  "author": "Vitalii Derda <derdavitaliy@gmail.com>",
+  "license": "GPL-3.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.1",
+    "express": "^4.18.2",
+    "fs-extra": "^11.2.0",
+    "google-auth-library": "^9.6.1",
+    "google-spreadsheet": "^4.1.1",
+    "node-telegram-bot-api": "^0.64.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
+  }
+}
