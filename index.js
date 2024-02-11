@@ -1,8 +1,12 @@
 import dotenv from 'dotenv';
 import express from 'express';
+import ky from 'ky';
+import { load } from 'cheerio';
+import { format, fromUnixTime } from 'date-fns';
 import TelegramBot from 'node-telegram-bot-api';
 import { GoogleAuth } from 'google-auth-library';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
+import { determineCategory } from './parser.helpers.js';
 
 dotenv.config();
 
@@ -30,9 +34,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 bot.on('message', async message => {
-  console.log('message', message);
-
-  const messageText = message?.text;
   const chatId = message?.chat?.id;
 
   const doc = new GoogleSpreadsheet(process.env.GOOGLE_SPREADSHEET_ID, auth);
@@ -40,25 +41,41 @@ bot.on('message', async message => {
   await doc.loadInfo();
 
   const sheet = doc.sheetsByIndex[0];
-  const rows = await sheet.getRows();
 
-  const dataFromSpreadsheet = rows.reduce((acc, row) => {
-    const rowDate = row.get('date');
+  let article = '';
 
-    if (rowDate) {
-      const linkEntry = {
-        title: row.get('title'),
-        description: row.get('description'),
-        category: row.get('category'),
-      };
+  try {
+    article = await ky.get(message.text).text();
+  } catch (error) {
+    return bot.sendMessage(chatId, '‼️ Something went wrong while fetching an article!');
+  }
 
-      acc[rowDate] = acc[rowDate] ? [...acc[rowDate], linkEntry] : [linkEntry];
-    }
+  const $ = load(article);
 
-    return acc;
-  }, {});
+  const title =
+    $('meta[property="og:title"]').attr('content') ||
+    $('title').text() ||
+    $('meta[name="title"]').attr('content');
 
-  bot.sendMessage(chatId, JSON.stringify({ dataFromSpreadsheet }));
+  const description =
+    $('meta[property="og:description"]').attr('content') || $('meta[name="description"]').attr('content');
+
+  const keywords =
+    $('meta[property="og:keywords"]').attr('content') || $('meta[name="keywords"]').attr('content');
+
+  try {
+    await sheet.addRow({
+      date: format(fromUnixTime(message?.date), 'dd/MM/yyyy'),
+      title,
+      description,
+      link: message?.text,
+      category: determineCategory(title, description, keywords),
+    });
+
+    bot.sendMessage(chatId, '✅ Link has been added successfully!');
+  } catch (error) {
+    bot.sendMessage(chatId, '🆘 Something went wrong while adding a link to the spreadsheet!');
+  }
 });
 
 app.listen(PORT, () => {
